@@ -1,39 +1,14 @@
 //This script was created by Sir Nacho
 
-#define "cLibrary/nachoShell.h"
+#include "cLibrary/nachoShell.h"
 
-
-int main (int argc, char **argv) {
-
-  //load any config files above
-
-  nsh_loop();
-
-  //Performs any shutdown or cleanup
-
-  return EXIT_SUCCESS; //
-}
-
-char* getUsername() {
-  char* username = getenv("USER");
-
-  if (username != NULL) {
-    return username;
-  }
-  else {
-    printf("NachoShell: Unable to grab your username.");
-    username = "NULL";
-    return username;
-  }
-}
-
-void nsh_loop(void){
+extern void nsh_loop (){
   char *line;
   char **args;
   int status;
-  //int shellLaunchStatus; //<-- This is to know if the shell is in debug or safe mode
+
   do {
-    printf("(NachoShell) ");
+    printf("(nachoShell) ");
     line = nsh_read_line();
     args = nsh_split_line(line);
     status = nsh_execute(args);
@@ -43,42 +18,96 @@ void nsh_loop(void){
   } while (status);
 }
 
-char *nsh_read_line(void){
-  int bufSize = NSH_RL_BUFSIZE;
+extern char *nsh_read_line(){
+  int bufsize = NSH_RL_BUFSIZE;
   int position = 0;
   char *buffer = malloc(sizeof(char) * bufsize);
-  int c;
   
-  //buffer check
+  //checks and reallocate more space if needed...
   if (!buffer) {
-    fprintf(stderr, "NachoShell: allocation error\n");
-    exitEXIT_FAILURE;
+    fprintf(stderr, "nachoShell: allocation error\n");
+    exit(EXIT_FAILURE);
   }
 
-  while (1) {
-    //reading a character
-    c = getchar();
+  while(1){
+    c = getChar();
 
-    //if hit with the EOF, replace with a null character and return.
-
-    if (c == EOF || c=='\n'){
-      buffer[position] = '\0';
+    if (c == EOF || c == '\n') {
+      buffer[position] = '\0'; //If get hit by EOF, we must replace it with a null character.
       return buffer;
     }
     else {
       buffer[position] = c;
-
     }
     position++;
 
-    //If exceeded the buffer, reallocate.
+    //If exceeded buffer, reallocate the space
     if (position >= bufsize) {
       bufsize += NSH_RL_BUFSIZE;
       buffer = realloc(buffer, bufsize);
       if (!buffer) {
-        fprintf(stderr, "NachoShell: allocation error\n");
-        exit EXIT_FAILURE;
+        fprintf(stderr, "nachShell: allocation error\n");
+        exit(EXIT_FAILURE);
       }
     }
   }
 }
+
+extern char *nsh_split_line(char *line){
+  int bufsize = NSH_TOK_BUFSIZE, position = 0;
+  char ** tokens = malloc(bufsize * sizeof(char*));
+  char *token;
+
+  if (!tokens){
+    fprintf(stderr, "nachoShell: allocation error\n");
+    exit(EXIT_FAILURE);
+  }
+
+  token = strlok(line, NSH_TOK_DELIM);
+  while (token != NULL) {
+    tokens[position] = token;
+    position++;
+
+    if (position >= bufsize) {
+      bufsize += NSH_TOK_BUFSIZE;
+      tokens = realloc(tokens, bufsize * sizeof(char*));
+      if (!tokens) {
+        fprintf(stderr, "nachoShell: allocation error\n");
+        exit(EXIT_FAILURE);
+      }
+    }
+    token = strtok(NULL, NSH_TOK_DELIM);
+  }
+  tokens[position] = NULL;
+  returns tokens;
+}
+
+extern int nsh_launch(char **args){
+  pid_t pid, wpid;
+  int status;
+
+  pid = fork();
+  if (pid == 0){
+    if (execvp(args[0], args) == -1) {perror("nsh");}
+    exit(EXIT_FAILURE);
+  }
+  else if (pid < 0){perror("nsh");}
+  else{
+    do {
+      wpid = waitpid(pid, &status, WUNTRACED);
+    }while (!WIFEXITED(status) && !WIFSIGNALED(status));
+  }
+
+  return 1;
+}
+
+int main(int argc, char **argv){
+  
+//load Config files, if any...
+  
+  nsh_loop();
+
+  return (EXIT_SUCCESS);
+}
+
+
